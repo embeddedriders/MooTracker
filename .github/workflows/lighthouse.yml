@@ -1,0 +1,55 @@
+name: Lighthouse CI Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lighthouse:
+    name: Lighthouse Performance & Accessibility Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --if-present
+
+      - name: Start local server
+        run: |
+          node server.js &
+          sleep 3
+          echo "Server started on port 3000"
+
+      - name: Wait for server to be ready
+        run: |
+          for i in {1..10}; do
+            curl -s http://localhost:3000 > /dev/null && echo "Server ready" && break
+            echo "Waiting for server... ($i/10)"
+            sleep 2
+          done
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v11
+        with:
+          urls: |
+            http://localhost:3000
+            http://localhost:3000/mobile.html
+          budgetPath: .github/lighthouse-budget.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Format Lighthouse Results
+        if: always()
+        run: |
+          echo "## 🔦 Lighthouse Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "Lighthouse audits completed. Check the uploaded artifacts for detailed reports." >> $GITHUB_STEP_SUMMARY
